@@ -207,13 +207,46 @@ def yf_ohlcv(symbol: str, *, timeframe: str = "1d") -> pd.DataFrame:
     return df
 
 
+def _fi(obj: Any, *names: str) -> Any:
+    """Read a value from yfinance FastInfo trying snake_case attrs then camelCase keys."""
+    for n in names:
+        try:
+            v = getattr(obj, n, None)
+            if v is not None:
+                return v
+        except Exception:
+            pass
+    for n in names:
+        try:
+            v = obj.get(n) if hasattr(obj, "get") else None
+            if v is not None:
+                return v
+        except Exception:
+            pass
+    return None
+
+
 def yf_quote(symbol: str) -> dict[str, Any]:
     _require_yf()
     t = to_yf_ticker(symbol)
     tk = yf.Ticker(t)
-    fast = tk.fast_info or {}
-    last = fast.get("last_price")
-    prev = fast.get("previous_close")
+    fast = tk.fast_info
+    last = _fi(fast, "last_price", "lastPrice", "regular_market_price", "regularMarketPrice")
+    prev = _fi(fast, "previous_close", "previousClose", "regularMarketPreviousClose")
+    # Fallback: pull last bar from a recent OHLCV history if fast_info empty.
+    if last is None or prev is None:
+        try:
+            hist = yf.download(t, period="5d", interval="1d", auto_adjust=False,
+                               progress=False, threads=False)
+            if hist is not None and not hist.empty:
+                if isinstance(hist.columns, pd.MultiIndex):
+                    hist.columns = [c[0] for c in hist.columns]
+                if last is None:
+                    last = float(hist["Close"].iloc[-1])
+                if prev is None and len(hist) > 1:
+                    prev = float(hist["Close"].iloc[-2])
+        except Exception:
+            pass
     change_pct = None
     if last is not None and prev:
         change_pct = (float(last) - float(prev)) / float(prev) * 100
@@ -223,11 +256,11 @@ def yf_quote(symbol: str) -> dict[str, Any]:
         "last": float(last) if last is not None else None,
         "previous_close": float(prev) if prev else None,
         "change_pct": change_pct,
-        "day_low": fast.get("day_low"),
-        "day_high": fast.get("day_high"),
-        "year_low": fast.get("year_low"),
-        "year_high": fast.get("year_high"),
-        "currency": fast.get("currency"),
+        "day_low": _fi(fast, "day_low", "dayLow"),
+        "day_high": _fi(fast, "day_high", "dayHigh"),
+        "year_low": _fi(fast, "year_low", "yearLow", "fiftyTwoWeekLow"),
+        "year_high": _fi(fast, "year_high", "yearHigh", "fiftyTwoWeekHigh"),
+        "currency": _fi(fast, "currency"),
     }
 
 

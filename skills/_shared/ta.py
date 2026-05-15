@@ -143,6 +143,16 @@ def _f(v: Any) -> float | None:
         return None
 
 
+def _col_by_prefix(df: pd.DataFrame | None, prefix: str) -> str | None:
+    """Find a column whose name starts with ``prefix``. Returns the first match."""
+    if df is None:
+        return None
+    for c in df.columns:
+        if c.startswith(prefix):
+            return c
+    return None
+
+
 def snapshot(df: pd.DataFrame, *, timeframe: str = "1d", series_n: int = 60) -> TASnapshot:
     """Compute a full TA snapshot at the latest bar."""
     _require_pta()
@@ -197,14 +207,26 @@ def snapshot(df: pd.DataFrame, *, timeframe: str = "1d", series_n: int = 60) -> 
     )
 
     last_close = float(close.iloc[-1])
-    rsi_v = _f(rsi.iloc[-1])
-    macd_v = _f(macd_df["MACD_12_26_9"].iloc[-1]) if macd_df is not None else None
-    sig_v = _f(macd_df["MACDs_12_26_9"].iloc[-1]) if macd_df is not None else None
-    hist_v = _f(macd_df["MACDh_12_26_9"].iloc[-1]) if macd_df is not None else None
-    prev_hist_v = _f(macd_df["MACDh_12_26_9"].iloc[-2]) if macd_df is not None and len(macd_df) > 1 else None
-    bb_u = _f(bb["BBU_20_2.0"].iloc[-1]) if bb is not None else None
-    bb_m = _f(bb["BBM_20_2.0"].iloc[-1]) if bb is not None else None
-    bb_l = _f(bb["BBL_20_2.0"].iloc[-1]) if bb is not None else None
+    rsi_v = _f(rsi.iloc[-1]) if rsi is not None else None
+    # MACD/BB column names vary between pandas-ta versions (e.g. BBU_20_2.0 vs BBU_20_2.0_2.0).
+    macd_col = _col_by_prefix(macd_df, "MACD_")
+    macds_col = _col_by_prefix(macd_df, "MACDs_")
+    macdh_col = _col_by_prefix(macd_df, "MACDh_")
+    bbu_col = _col_by_prefix(bb, "BBU_")
+    bbm_col = _col_by_prefix(bb, "BBM_")
+    bbl_col = _col_by_prefix(bb, "BBL_")
+    stoch_k_col = _col_by_prefix(stoch, "STOCHk_")
+    stoch_d_col = _col_by_prefix(stoch, "STOCHd_")
+
+    macd_v = _f(macd_df[macd_col].iloc[-1]) if macd_col else None
+    sig_v = _f(macd_df[macds_col].iloc[-1]) if macds_col else None
+    hist_v = _f(macd_df[macdh_col].iloc[-1]) if macdh_col else None
+    prev_hist_v = (
+        _f(macd_df[macdh_col].iloc[-2]) if macdh_col and len(macd_df) > 1 else None
+    )
+    bb_u = _f(bb[bbu_col].iloc[-1]) if bbu_col else None
+    bb_m = _f(bb[bbm_col].iloc[-1]) if bbm_col else None
+    bb_l = _f(bb[bbl_col].iloc[-1]) if bbl_col else None
     bb_pct = None
     if bb_u and bb_l and bb_u != bb_l:
         bb_pct = (last_close - bb_l) / (bb_u - bb_l)
@@ -215,8 +237,8 @@ def snapshot(df: pd.DataFrame, *, timeframe: str = "1d", series_n: int = 60) -> 
         last_bar_time=df.index[-1].isoformat(),
         rsi_14=rsi_v,
         rsi_state=_classify_rsi(rsi_v) if rsi_v is not None else None,
-        stoch_k=_f(stoch["STOCHk_14_3_3"].iloc[-1]) if stoch is not None else None,
-        stoch_d=_f(stoch["STOCHd_14_3_3"].iloc[-1]) if stoch is not None else None,
+        stoch_k=_f(stoch[stoch_k_col].iloc[-1]) if stoch_k_col else None,
+        stoch_d=_f(stoch[stoch_d_col].iloc[-1]) if stoch_d_col else None,
         macd=macd_v,
         macd_signal=sig_v,
         macd_hist=hist_v,

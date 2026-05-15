@@ -83,21 +83,40 @@ def ohlcv(symbol: str, *, timeframe: str = "1d") -> pd.DataFrame:
     return df
 
 
+def _fi(obj: Any, *names: str) -> Any:
+    """Read a value from yfinance FastInfo trying snake_case attrs then camelCase keys."""
+    for n in names:
+        try:
+            v = getattr(obj, n, None)
+            if v is not None:
+                return v
+        except Exception:
+            pass
+    for n in names:
+        try:
+            v = obj.get(n) if hasattr(obj, "get") else None
+            if v is not None:
+                return v
+        except Exception:
+            pass
+    return None
+
+
 @retry(stop=stop_after_attempt(2), wait=wait_exponential(min=1, max=5))
 def quote(symbol: str) -> dict[str, Any]:
     """Return a snapshot (last price, day range, mcap, PER, dividend yield)."""
     _require_yf()
     t = normalize_ticker(symbol)
     tk = yf.Ticker(t)
-    fast = tk.fast_info or {}
+    fast = tk.fast_info
     info: dict[str, Any] = {}
     try:
         info = tk.info or {}
     except Exception:
         info = {}
 
-    last = fast.get("last_price") or info.get("regularMarketPrice")
-    prev = fast.get("previous_close") or info.get("regularMarketPreviousClose")
+    last = _fi(fast, "last_price", "lastPrice") or info.get("regularMarketPrice")
+    prev = _fi(fast, "previous_close", "previousClose") or info.get("regularMarketPreviousClose")
     change_pct = None
     if last is not None and prev:
         change_pct = (float(last) - float(prev)) / float(prev) * 100
@@ -106,12 +125,12 @@ def quote(symbol: str) -> dict[str, Any]:
         "ok": True,
         "symbol": t,
         "name": info.get("shortName") or info.get("longName"),
-        "currency": fast.get("currency") or info.get("currency") or "IDR",
+        "currency": _fi(fast, "currency") or info.get("currency") or "IDR",
         "last": float(last) if last is not None else None,
         "previous_close": float(prev) if prev else None,
         "change_pct": change_pct,
-        "day_low": fast.get("day_low"),
-        "day_high": fast.get("day_high"),
+        "day_low": _fi(fast, "day_low", "dayLow"),
+        "day_high": _fi(fast, "day_high", "dayHigh"),
         "year_low": info.get("fiftyTwoWeekLow"),
         "year_high": info.get("fiftyTwoWeekHigh"),
         "market_cap": info.get("marketCap"),

@@ -87,13 +87,35 @@ def summarize(payload: dict[str, Any], *, timeout: float = 30.0) -> str:
                 ],
                 "temperature": 0.4,
                 "max_tokens": 400,
+                "stream": False,
             },
             timeout=timeout,
         )
         if resp.status_code != 200:
             return _fallback(payload) + f"\n(LLM HTTP {resp.status_code})"
-        data = resp.json()
-        text = data["choices"][0]["message"]["content"].strip()
+        ct = (resp.headers.get("content-type") or "").lower()
+        if "text/event-stream" in ct or resp.text.lstrip().startswith("data:"):
+            # Server ignored stream=false; aggregate SSE chunks ourselves.
+            chunks: list[str] = []
+            for raw in resp.text.splitlines():
+                line = raw.strip()
+                if not line.startswith("data:"):
+                    continue
+                body = line[5:].strip()
+                if not body or body == "[DONE]":
+                    continue
+                try:
+                    obj = json.loads(body)
+                    delta = obj.get("choices", [{}])[0].get("delta", {})
+                    piece = delta.get("content")
+                    if piece:
+                        chunks.append(piece)
+                except Exception:
+                    continue
+            text = "".join(chunks).strip()
+        else:
+            data = resp.json()
+            text = (data["choices"][0]["message"]["content"] or "").strip()
         return text or _fallback(payload)
     except Exception as e:  # pragma: no cover
         return _fallback(payload) + f"\n(LLM error: {type(e).__name__})"
