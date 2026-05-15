@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=70", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hermes-market-skills"
+version = "0.1.0"
+description = "Hermes AI agent market-analysis skills (crypto / saham IDN / forex+commodity)."
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Hermes (Gresman)", email = "jagurlambeks2234@gmail.com" }
+]
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Topic :: Office/Business :: Financial :: Investment",
+]
+dynamic = ["dependencies"]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["skills*"]
+exclude = ["tests*"]

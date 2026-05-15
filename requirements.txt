@@ -1,0 +1,23 @@
+# core
+requests>=2.32
+python-dateutil>=2.9
+
+# data + ta
+pandas>=2.2
+numpy>=1.26
+pandas-ta>=0.3.14b0  # technical analysis indicators
+
+# data feeds
+yfinance>=0.2.45     # saham IDN (.JK) + commodity futures
+ccxt>=4.4            # crypto exchange OHLCV (Binance, Bybit, Kraken, etc.)
+feedparser>=6.0      # RSS feeds (Bisnis Indonesia, Kontan, CryptoPanic)
+beautifulsoup4>=4.12 # IDX + ForexFactory scrape
+lxml>=5.2            # BS4 fast parser
+
+# charting
+matplotlib>=3.9
+mplfinance>=0.12.10b0  # candlestick + overlay
+
+# robustness
+tenacity>=8.5        # retry with backoff for flaky free APIs
+diskcache>=5.6       # http response cache (be polite to free tier)
